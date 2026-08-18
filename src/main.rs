@@ -1,7 +1,7 @@
 mod argparse;
 
 fn main() {
-    let args = match argparse::parse_args() {
+    let args = match argparse::parse() {
         Ok(v) => v,
         Err(e) => {
             eprintln!("Error: {}.", e);
