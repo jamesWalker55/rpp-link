@@ -47,7 +47,7 @@ fn main() {
                 continue;
             }
         };
-        let usages = match rpp::parse_project(&proj) {
+        let proj = match rpp::parse_project(&proj) {
             Ok(x) => x,
             Err(err) => {
                 eprintln!("failed to find paths {}: {}", entry.path().display(), err);
@@ -55,7 +55,8 @@ fn main() {
             }
         };
         println!("{}", entry.path().display());
-        for (usage, path) in usages {
+        println!("  {}", proj.date);
+        for (usage, path) in proj.usages {
             if path.is_relative() {
                 println!(
                     "  {:?}: {}",

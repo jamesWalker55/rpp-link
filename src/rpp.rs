@@ -31,23 +31,25 @@ pub enum Usage {
 
 pub type FileUsages<'a> = Vec<(Usage, &'a Path)>;
 
-pub fn parse_project<'a>(e: &'a Element) -> Result<FileUsages<'a>, String> {
+pub struct Project<'a> {
+    pub date: Timestamp,
+    pub usages: FileUsages<'a>,
+}
+
+pub fn parse_project<'a>(e: &'a Element) -> Result<Project<'a>, String> {
     if e.tag != "REAPER_PROJECT" {
         return Err(format!("expected project tag: {}", e.tag));
     }
 
-    let attr: &[&str; 3] = e
-        .attr
-        .as_slice()
-        .try_into()
-        .map_err(|_| format!("expected 3 project attrs: {:?}", e.attr))?;
-
     let date = {
-        let num = attr[2]
+        let num = e
+            .attr
+            .get(2)
+            .ok_or_else(|| format!("can't find project date: {:?}", e.attr))?
             .parse::<i64>()
-            .map_err(|_| format!("project date is malformed: {:?}", attr))?;
+            .map_err(|_| format!("project date is malformed: {:?}", e.attr))?;
 
-        Timestamp::from_second(num).map_err(|_| format!("invalid project date: {:?}", attr))?
+        Timestamp::from_second(num).map_err(|_| format!("invalid project date: {:?}", e.attr))?
     };
 
     let mut file_usages: FileUsages = vec![];
@@ -64,16 +66,19 @@ pub fn parse_project<'a>(e: &'a Element) -> Result<FileUsages<'a>, String> {
                 _ => (),
             },
             Child::Element(child) => match child.tag {
-                "METRONOME" => {
-                    for path in iter_metronome_paths(child) {
-                        file_usages.push((Usage::Metronome, path));
-                    }
-                }
+                // "METRONOME" => {
+                //     for path in iter_metronome_paths(child) {
+                //         file_usages.push((Usage::Metronome, path));
+                //     }
+                // }
                 _ => (),
             },
             _ => (),
         }
     }
 
-    Ok(file_usages)
+    Ok(Project {
+        date,
+        usages: file_usages,
+    })
 }
