@@ -4,6 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+jiff = "0.2.35"
 pico-args = "0.5.0"
 rpp-parser = { git = "https://github.com/jamesWalker55/rpp-parser.git", rev = "197e07c85e277387879887f56c99a482d4da78f5" }
 walkdir = "2"
+
+# [lints.clippy]
+# pedantic = "warn"
+# nursery = "warn"

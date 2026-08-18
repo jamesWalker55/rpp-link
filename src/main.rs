@@ -3,6 +3,7 @@ use std::{fs, path::Path};
 use walkdir::WalkDir;
 
 mod argparse;
+mod rpp;
 
 fn iter_rpp_files(dir: &Path) -> impl Iterator<Item = walkdir::DirEntry> {
     WalkDir::new(dir)
@@ -46,5 +47,29 @@ fn main() {
                 continue;
             }
         };
+        let usages = match rpp::parse_project(&proj) {
+            Ok(x) => x,
+            Err(err) => {
+                eprintln!("failed to find paths {}: {}", entry.path().display(), err);
+                continue;
+            }
+        };
+        println!("{}", entry.path().display());
+        for (usage, path) in usages {
+            if path.is_relative() {
+                println!(
+                    "  {:?}: {}",
+                    usage,
+                    entry
+                        .path()
+                        .parent()
+                        .expect("project parent dir")
+                        .join(path)
+                        .display()
+                );
+            } else {
+                println!("  {:?}: {}", usage, path.display());
+            }
+        }
     }
 }
