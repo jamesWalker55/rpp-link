@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{fs, path::Path};
 
 use walkdir::WalkDir;
 
@@ -28,6 +28,23 @@ fn main() {
     println!("{:#?}", args);
 
     for entry in iter_rpp_files(&args.path) {
-        println!("Found .rpp file: {}", entry.path().display());
+        let text = match fs::read_to_string(entry.path()) {
+            Ok(x) => x,
+            Err(err) => {
+                eprintln!("failed to read {}: {}", entry.path().display(), err);
+                continue;
+            }
+        };
+        let proj = match rpp_parser::parser::parse_element(&text) {
+            Ok(x) => x,
+            Err(err) => {
+                eprintln!(
+                    "failed to parse {}: {}",
+                    entry.path().display(),
+                    err.code.description()
+                );
+                continue;
+            }
+        };
     }
 }
