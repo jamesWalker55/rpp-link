@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const HELP: &str = "\
 App
@@ -15,7 +15,7 @@ ARGS:
 
 #[derive(Debug)]
 pub struct Args {
-    path: PathBuf,
+    pub path: PathBuf,
 }
 
 pub fn parse() -> Result<Args, pico_args::Error> {
@@ -28,7 +28,7 @@ pub fn parse() -> Result<Args, pico_args::Error> {
     }
 
     let args = Args {
-        path: pargs.free_from_str()?,
+        path: pargs.free_from_fn(parse_existing_path)?,
     };
 
     // It's up to the caller what to do with the remaining arguments.
@@ -40,4 +40,12 @@ pub fn parse() -> Result<Args, pico_args::Error> {
     }
 
     Ok(args)
+}
+
+fn parse_existing_path(s: &str) -> Result<PathBuf, &'static str> {
+    let p = Path::new(s);
+    if !p.exists() {
+        return Err("path does not exist");
+    }
+    Ok(p.to_path_buf())
 }

@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 pico-args = "0.5.0"
 rpp-parser = { git = "https://github.com/jamesWalker55/rpp-parser.git", commit = "dcb5b39e6bc907c065dcedf574746a440486ff48" }
+walkdir = "2"
