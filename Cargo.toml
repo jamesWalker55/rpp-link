@@ -4,3 +4,4 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+rpp-parser = { git = "https://github.com/jamesWalker55/rpp-parser.git", commit = "dcb5b39e6bc907c065dcedf574746a440486ff48" }
