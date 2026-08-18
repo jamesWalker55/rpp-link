@@ -55,7 +55,7 @@ fn main() {
             }
         };
         println!("{}", entry.path().display());
-        println!("  {}", proj.date);
+        println!("  Date: {}", proj.date);
         for (usage, path) in proj.usages {
             if path.is_relative() {
                 println!(
