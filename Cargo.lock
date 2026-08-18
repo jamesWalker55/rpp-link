@@ -92,7 +92,7 @@ dependencies = [
 [[package]]
 name = "rpp-parser"
 version = "0.1.1"
-source = "git+https://github.com/jamesWalker55/rpp-parser.git#dcb5b39e6bc907c065dcedf574746a440486ff48"
+source = "git+https://github.com/jamesWalker55/rpp-parser.git?rev=197e07c85e277387879887f56c99a482d4da78f5#197e07c85e277387879887f56c99a482d4da78f5"
 dependencies = [
  "itertools",
  "nom",
