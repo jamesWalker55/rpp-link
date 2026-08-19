@@ -12,6 +12,23 @@ use jiff::Timestamp;
 use rpp_parser::parser::{Child, Element};
 use smallvec::{SmallVec, smallvec};
 
+fn child_as_arr<'a, const N: usize>(child: &'a Child<'a>) -> Option<[&'a str; N]> {
+    let Child::Line(line) = child else {
+        return None;
+    };
+    let Ok(res) = TryInto::<[&str; N]>::try_into(line.as_slice()) else {
+        return None;
+    };
+    Some(res)
+}
+
+fn attr_as_arr<'a, const N: usize>(attr: &'a [&'a str]) -> Option<[&'a str; N]> {
+    let Ok(res) = TryInto::<[&str; N]>::try_into(attr) else {
+        return None;
+    };
+    Some(res)
+}
+
 fn iter_metronome_paths<'a>(e: &'a Element<'a>) -> impl Iterator<Item = &'a Path> {
     e.children
         .iter()
@@ -114,7 +131,7 @@ fn extract_plugin_strings<'a>(plugin: &'a Element<'a>) -> Option<Vec<String>> {
 }
 
 fn get_source_path<'a>(e: &'a Element<'a>) -> Option<&'a Path> {
-    let Ok([source_type]) = TryInto::<[&str; 1]>::try_into(e.attr.as_slice()) else {
+    let Some([source_type]) = attr_as_arr(&e.attr) else {
         eprintln!("item source attr has more than 1 value: {:?}", e.attr);
         return None;
     };
@@ -125,8 +142,7 @@ fn get_source_path<'a>(e: &'a Element<'a>) -> Option<&'a Path> {
                 .children
                 .iter()
                 .filter_map(|child| {
-                    if let Child::Line(line) = child
-                        && let Ok([key, val]) = TryInto::<[&str; 2]>::try_into(line.as_slice())
+                    if let Some([key, val]) = child_as_arr(child)
                         && key == "FILE"
                     {
                         Some(val)
