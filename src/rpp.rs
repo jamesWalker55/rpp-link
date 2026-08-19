@@ -3,6 +3,7 @@ use std::{
     collections::{BTreeMap, HashMap},
     fmt::Display,
     path::{Path, PathBuf},
+    sync::LazyLock,
 };
 
 use base64_simd::STANDARD as base64;
@@ -188,26 +189,50 @@ fn iter_track_item_paths<'a>(e: &'a Element<'a>) -> impl Iterator<Item = &'a Pat
         .filter_map(|source| get_source_path(source))
 }
 
-fn extract_plugin_path(e: &Element) -> Option<PathBuf> {
+fn extract_plugin_path(e: &Element) -> SmallVec<[PathBuf; 1]> {
     if e.tag == "VST"
         && e.attr
             .get(1)
             .map(|ident| *ident == "reasamplomatic.dll")
             .unwrap_or(false)
     {
-        // reasamplomatic
         let Some(strings) = extract_plugin_strings(e) else {
-            eprintln!("failed to get sample path from reasamplomatic fx");
-            return None;
+            eprintln!("failed to get sample path from fx reasamplomatic");
+            return smallvec![];
         };
-        strings.get(0).map(PathBuf::from)
+        strings.get(0).map(PathBuf::from).into_iter().collect()
+    } else if e.tag == "VST"
+        && e.attr
+            .get(1)
+            .map(|ident| *ident == "NadIR.vst3")
+            .unwrap_or(false)
+    {
+        let Some(config) = extract_plugin_strings(e)
+            .and_then(|list| list.into_iter().filter(|x| x.len() >= 100).next())
+        else {
+            eprintln!("failed to get sample path from fx NadIR");
+            return smallvec![];
+        };
+
+        // config is a JSON, but it may have garbage data before/after it, so use regex instead
+        static PATTERN: LazyLock<regex::Regex> =
+            LazyLock::new(|| regex::Regex::new(r#""IRPath[01]" *: *("(?:[^"\\]|\\.)*")"#).unwrap());
+
+        PATTERN
+            .captures_iter(&config)
+            .map(|c| c.get(1).expect("group 1"))
+            // ignore built-in files
+            .filter(|mat| !mat.as_str().starts_with("\"${documents}"))
+            .map(|mat| serde_json::from_str::<String>(mat.as_str()).expect("malformed json string"))
+            .map(|text| PathBuf::from(text))
+            .collect()
     } else {
-        let Some(strings) = extract_plugin_strings(e) else {
-            return None;
-        };
-        println!("  <{} {:?}> {:?}", e.tag, e.attr, strings);
-        // TODO
-        None
+        // let Some(strings) = extract_plugin_strings(e) else {
+        //     return None;
+        // };
+        // println!("  <{} {:?}> {:?}", e.tag, e.attr, strings);
+        // // TODO
+        smallvec![]
     }
 }
 
@@ -220,7 +245,7 @@ fn extract_fxchain_paths(e: &Element) -> SmallVec<[PathBuf; 2]> {
 
     plugins
         .into_iter()
-        .filter_map(|plugin| extract_plugin_path(plugin))
+        .flat_map(|plugin| extract_plugin_path(plugin))
         .collect()
 }
 
