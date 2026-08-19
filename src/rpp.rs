@@ -95,7 +95,7 @@ fn extract_plugin_strings<'a>(plugin: &'a Element<'a>) -> Option<Vec<String>> {
 
         data.utf8_chunks()
             .map(|chunk| chunk.valid())
-            .flat_map(|s| s.split(|c: char| c.is_control()))
+            .flat_map(|s| s.split(|c: char| c.is_control() && c != '\n' && c != '\r'))
             .filter(|s| s.chars().count() >= 5)
             .map(|x| x.to_string())
             .collect()
@@ -273,6 +273,42 @@ fn extract_plugin_path(e: &Element) -> SmallVec<[PathBuf; 1]> {
             .filter(|mat| !mat.as_str().starts_with("\"${documents}"))
             .map(|mat| serde_json::from_str::<String>(mat.as_str()).expect("malformed json string"))
             .map(|text| PathBuf::from(text))
+            .collect()
+    } else if e.tag == "VST"
+        && e.attr
+            .get(1)
+            .map(|ident| *ident == "Sitala.dll")
+            .unwrap_or(false)
+    {
+        let Some(config) = extract_plugin_strings(e)
+            .and_then(|list| list.into_iter().filter(|x| x.len() >= 100).next())
+        else {
+            eprintln!("failed to get sample path from fx Sitala");
+            return smallvec![];
+        };
+
+        // config is a JSON, but it may have garbage data before/after it, so use regex instead
+        static PATTERN: LazyLock<regex::Regex> = LazyLock::new(|| {
+            regex::Regex::new(r#"<sound slot="\d+" location=("(?:[^"\\]|\\.)*")"#).unwrap()
+        });
+
+        PATTERN
+            .captures_iter(&config)
+            .map(|c| c.get(1).expect("group 1"))
+            .map(|mat| serde_json::from_str::<String>(mat.as_str()).expect("malformed json string"))
+            .filter_map(|path| {
+                if let Ok(path) = urlencoding::decode(path.as_str())
+                    && path.starts_with("file:///")
+                {
+                    Some(PathBuf::from(&path["file:///".len()..]))
+                } else {
+                    eprintln!(
+                        "malformed sample path in fx Sitala config: {}",
+                        path.as_str()
+                    );
+                    None
+                }
+            })
             .collect()
     } else {
         // let Some(strings) = extract_plugin_strings(e) else {
