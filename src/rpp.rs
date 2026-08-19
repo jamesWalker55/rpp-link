@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use base64_simd::STANDARD as base64;
 use jiff::Timestamp;
 use rpp_parser::parser::{Child, Element};
 
@@ -21,6 +22,84 @@ fn iter_metronome_paths<'a>(e: &'a Element) -> impl Iterator<Item = &'a Path> {
             }
         })
         .flatten()
+}
+
+/// Parse a `FXCHAIN` element
+fn find_fxchain_plugins<'a>(e: &'a Element<'a>, out: &mut Vec<&'a Element<'a>>) {
+    for child in &e.children {
+        let Child::Element(child) = child else {
+            continue;
+        };
+        match child.tag {
+            // both vst2 and vst3
+            "VST" => out.push(child),
+            "CLAP" => out.push(child),
+            "CONTAINER" => find_fxchain_plugins(child, out),
+            // "JS" => None,
+            _ => (),
+        }
+    }
+}
+
+fn extract_plugin_strings<'a>(plugin: &'a Element<'a>) -> Option<Vec<String>> {
+    fn b64_extract_strings(children: &[Child]) -> Vec<String> {
+        let lines = children.iter().filter_map(|x| {
+            if let Child::Line(items) = x {
+                if items.len() != 1 {
+                    eprintln!("warning: plugin data contains space");
+                }
+                items.first()
+            } else {
+                eprintln!("warning: non-data found in plugin");
+                None
+            }
+        });
+
+        let mut data: Vec<u8> = vec![];
+        for line in lines {
+            let res = base64.decode_append(line.as_bytes(), &mut data);
+            if res.is_err() {
+                eprintln!("warning: failed to decode plugin data");
+                return vec![];
+            }
+        }
+
+        data.utf8_chunks()
+            .map(|chunk| chunk.valid())
+            .flat_map(|s| s.split(|c: char| c.is_control()))
+            .filter(|s| s.chars().count() >= 5)
+            .map(|x| x.to_string())
+            .collect()
+    }
+
+    let result = match plugin.tag {
+        // both vst2 and vst3
+        "VST" => b64_extract_strings(&plugin.children),
+        "CLAP" => {
+            // find the <STATE> element
+            let state = plugin
+                .children
+                .iter()
+                .filter_map(|x| {
+                    if let Child::Element(y) = x {
+                        Some(y)
+                    } else {
+                        None
+                    }
+                })
+                .find(|x| x.tag == "STATE");
+
+            let Some(state) = state else {
+                eprintln!("warning: failed to find CLAP plugin data");
+                return None;
+            };
+
+            b64_extract_strings(&state.children)
+        }
+        _ => return None,
+    };
+
+    Some(result)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -71,6 +150,59 @@ pub fn parse_project<'a>(e: &'a Element) -> Result<Project<'a>, String> {
                 //         file_usages.push((Usage::Metronome, path));
                 //     }
                 // }
+                // "MASTERFXLIST" => {
+                //     let plugins = {
+                //         let mut out = vec![];
+                //         find_fxchain_plugins(child, &mut out);
+                //         out
+                //     };
+                //     for plugin in plugins {
+                //         let Some(strings) = extract_plugin_strings(plugin) else {
+                //             continue;
+                //         };
+                //         println!("  <{} {:?}> {:?}", plugin.tag, plugin.attr, strings);
+                //         // TODO
+                //     }
+                // }
+                "TRACK" => {
+                    let items = child.children.iter().filter_map(|x| {
+                        if let Child::Element(x) = x
+                            && x.tag == "ITEM"
+                        {
+                            Some(x)
+                        } else {
+                            None
+                        }
+                    });
+
+                    // let fxchain = child
+                    //     .children
+                    //     .iter()
+                    //     .filter_map(|x| {
+                    //         if let Child::Element(x) = x
+                    //             && x.tag == "FXCHAIN"
+                    //         {
+                    //             Some(x)
+                    //         } else {
+                    //             None
+                    //         }
+                    //     })
+                    //     .next();
+                    // if let Some(fxchain) = fxchain {
+                    //     let plugins = {
+                    //         let mut out = vec![];
+                    //         find_fxchain_plugins(fxchain, &mut out);
+                    //         out
+                    //     };
+                    //     for plugin in plugins {
+                    //         let Some(strings) = extract_plugin_strings(plugin) else {
+                    //             continue;
+                    //         };
+                    //         println!("  <{} {:?}> {:?}", plugin.tag, plugin.attr, strings);
+                    //         // TODO
+                    //     }
+                    // }
+                }
                 _ => (),
             },
             _ => (),

@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+base64-simd = "0.8.0"
+itertools = "0.15.0"
 jiff = "0.2.35"
 pico-args = "0.5.0"
 rpp-parser = { git = "https://github.com/jamesWalker55/rpp-parser.git", rev = "197e07c85e277387879887f56c99a482d4da78f5" }
