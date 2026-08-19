@@ -59,7 +59,8 @@ fn find_fxchain_plugins<'a>(e: &'a Element<'a>, out: &mut Vec<&'a Element<'a>>) 
             // both vst2 and vst3
             "VST" | "CLAP" => out.push(child),
             "CONTAINER" => find_fxchain_plugins(child, out),
-            "JS" | "PARMENV" | "PROGRAMENV" | "IN_PINS" | "OUT_PINS" | "JS_SER" | "JS_PINMAP" => (),
+            "JS" | "PARMENV" | "PROGRAMENV" | "IN_PINS" | "OUT_PINS" | "JS_SER" | "JS_PINMAP"
+            | "COMMENT" | "VIDEO_EFFECT" => (),
             _ => {
                 eprintln!("unhandled plugin type! {:?}", child.tag);
                 eprintln!("{:?}", e);
@@ -131,33 +132,56 @@ fn extract_plugin_strings<'a>(plugin: &'a Element<'a>) -> Option<Vec<String>> {
 }
 
 fn get_source_path<'a>(e: &'a Element<'a>) -> Option<&'a Path> {
-    let Some([source_type]) = attr_as_arr(&e.attr) else {
+    let Some([mut source_type]) = attr_as_arr(&e.attr) else {
         eprintln!("item source attr has more than 1 value: {:?}", e.attr);
         return None;
     };
+    if source_type.starts_with("_OFFLINE_") {
+        source_type = &source_type["_OFFLINE_".len()..];
+    }
     match source_type {
-        "MIDI" | "MIDIPOOL" => None,
-        "FLAC" | "WAVE" | "VORBIS" | "RPP_PROJECT" | "VIDEO" => {
-            let source_file = e
+        "MIDI" | "MIDIPOOL" | "CLICK" | "EMPTY" => None,
+        "FLAC" | "WAVE" | "VORBIS" | "OPUS" | "WAVE_SLICE" | "REX" | "RPP_PROJECT" | "VIDEO" => {
+            let res = e
                 .children
                 .iter()
                 .filter_map(|child| {
                     if let Some([key, val]) = child_as_arr(child)
                         && key == "FILE"
                     {
-                        Some(val)
+                        Some(Path::new(val))
                     } else {
                         None
                     }
                 })
                 .next();
-            if let Some(source_file) = source_file {
-                Some(Path::new(source_file))
-            } else {
+            if res.is_none() {
                 eprintln!("failed to find source path in <{}>", source_type);
                 eprintln!("{:?}", e);
                 panic!("failed to find source path in <{}>", source_type);
             }
+            res
+        }
+        "MP3" => {
+            let res = e
+                .children
+                .iter()
+                .filter_map(|child| {
+                    if let Some([key, val, _]) = child_as_arr(child)
+                        && key == "FILE"
+                    {
+                        Some(Path::new(val))
+                    } else {
+                        None
+                    }
+                })
+                .next();
+            if res.is_none() {
+                eprintln!("failed to find source path in <{}>", source_type);
+                eprintln!("{:?}", e);
+                panic!("failed to find source path in <{}>", source_type);
+            }
+            res
         }
         "SECTION" => {
             // find the inner source
