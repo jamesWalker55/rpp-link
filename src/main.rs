@@ -55,7 +55,7 @@ fn main() {
             }
         };
         println!("{}", entry.path().display());
-        println!("  Date: {}", proj.date);
+        println!(" Date: {}", proj.date);
         let sorted_usages = {
             let mut x: Vec<_> = proj.usages.iter().collect();
             x.sort();
@@ -64,17 +64,17 @@ fn main() {
         for (path, usage) in sorted_usages {
             if path.is_relative() {
                 println!(
-                    "  {} {:?}",
+                    " [{}] {}",
+                    usage,
                     entry
                         .path()
                         .parent()
                         .expect("project parent dir")
                         .join(path)
                         .display(),
-                    usage,
                 );
             } else {
-                println!("  {} {:?}", path.display(), usage);
+                println!(" [{}] {}", usage, path.display());
             }
         }
     }

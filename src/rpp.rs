@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::Path};
+use std::{collections::HashMap, fmt::Display, path::Path};
 
 use base64_simd::STANDARD as base64;
 use bitflags::bitflags;
@@ -189,6 +189,27 @@ bitflags! {
         const ITEM = 0b00000001;
         const RECORD_PATH = 0b00000010;
         const METRONOME = 0b00000100;
+    }
+}
+
+impl Display for Usages {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.contains(Self::ITEM) {
+            write!(f, "I")?;
+        } else {
+            write!(f, " ")?;
+        }
+        if self.contains(Self::RECORD_PATH) {
+            write!(f, "R")?;
+        } else {
+            write!(f, " ")?;
+        }
+        if self.contains(Self::METRONOME) {
+            write!(f, "M")?;
+        } else {
+            write!(f, " ")?;
+        }
+        Ok(())
     }
 }
 
