@@ -4,7 +4,7 @@ use base64_simd::STANDARD as base64;
 use jiff::Timestamp;
 use rpp_parser::parser::{Child, Element};
 
-fn iter_metronome_paths<'a>(e: &'a Element) -> impl Iterator<Item = &'a Path> {
+fn iter_metronome_paths<'a>(e: &'a Element<'a>) -> impl Iterator<Item = &'a Path> {
     e.children
         .iter()
         .filter_map(|child| {
@@ -102,10 +102,91 @@ fn extract_plugin_strings<'a>(plugin: &'a Element<'a>) -> Option<Vec<String>> {
     Some(result)
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+fn get_source_path<'a>(e: &'a Element<'a>) -> Option<&'a Path> {
+    let Ok([source_type]) = TryInto::<[&str; 1]>::try_into(e.attr.as_slice()) else {
+        eprintln!("item source attr has more than 1 value: {:?}", e.attr);
+        return None;
+    };
+    match source_type {
+        "MIDI" => None,
+        "FLAC" | "WAVE" => {
+            let source_file = e
+                .children
+                .iter()
+                .filter_map(|child| {
+                    if let Child::Line(line) = child
+                        && let Ok([key, val]) = TryInto::<[&str; 2]>::try_into(line.as_slice())
+                        && key == "FILE"
+                    {
+                        Some(val)
+                    } else {
+                        None
+                    }
+                })
+                .next();
+            if let Some(source_file) = source_file {
+                Some(Path::new(source_file))
+            } else {
+                eprintln!("failed to find source path in <{}>", source_type);
+                None
+            }
+        }
+        "SECTION" => {
+            // find the inner source
+            e.children
+                .iter()
+                .filter_map(|child| {
+                    if let Child::Element(child) = child
+                        && child.tag == "SOURCE"
+                    {
+                        get_source_path(child)
+                    } else {
+                        None
+                    }
+                })
+                .next()
+                .or_else(|| {
+                    eprintln!("failed to find source path in <SECTION>");
+                    None
+                })
+        }
+        _ => {
+            todo!("unhandled source type! {:?}", source_type)
+        }
+    }
+}
+
+fn iter_track_item_paths<'a>(e: &'a Element<'a>) -> impl Iterator<Item = &'a Path> {
+    e.children
+        .iter()
+        .filter_map(|x| {
+            if let Child::Element(x) = x
+                && x.tag == "ITEM"
+            {
+                Some(x)
+            } else {
+                None
+            }
+        })
+        .flat_map(|item| {
+            item.children.iter().filter_map(|x| {
+                if let Child::Element(x) = x
+                    && x.tag == "SOURCE"
+                {
+                    Some(x)
+                } else {
+                    None
+                }
+            })
+        })
+        .filter_map(|source| get_source_path(source))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Usage {
     Metronome,
     RecordPath,
+    Item,
 }
 
 pub type FileUsages<'a> = Vec<(Usage, &'a Path)>;
@@ -115,7 +196,7 @@ pub struct Project<'a> {
     pub usages: FileUsages<'a>,
 }
 
-pub fn parse_project<'a>(e: &'a Element) -> Result<Project<'a>, String> {
+pub fn parse_project<'a>(e: &'a Element<'a>) -> Result<Project<'a>, String> {
     if e.tag != "REAPER_PROJECT" {
         return Err(format!("expected project tag: {}", e.tag));
     }
@@ -165,16 +246,9 @@ pub fn parse_project<'a>(e: &'a Element) -> Result<Project<'a>, String> {
                 //     }
                 // }
                 "TRACK" => {
-                    let items = child.children.iter().filter_map(|x| {
-                        if let Child::Element(x) = x
-                            && x.tag == "ITEM"
-                        {
-                            Some(x)
-                        } else {
-                            None
-                        }
-                    });
-
+                    for path in iter_track_item_paths(child) {
+                        file_usages.push((Usage::Item, path));
+                    }
                     // let fxchain = child
                     //     .children
                     //     .iter()
