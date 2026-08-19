@@ -109,8 +109,8 @@ fn get_source_path<'a>(e: &'a Element<'a>) -> Option<&'a Path> {
         return None;
     };
     match source_type {
-        "MIDI" => None,
-        "FLAC" | "WAVE" => {
+        "MIDI" | "MIDIPOOL" => None,
+        "FLAC" | "WAVE" | "RPP_PROJECT" => {
             let source_file = e
                 .children
                 .iter()
