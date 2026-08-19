@@ -1,5 +1,6 @@
 use std::{
-    collections::HashMap,
+    borrow::Cow,
+    collections::{BTreeMap, HashMap},
     fmt::Display,
     path::{Path, PathBuf},
 };
@@ -227,8 +228,11 @@ bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
     pub struct Usages: u8 {
         const ITEM = 0b00000001;
-        const RECORD_PATH = 0b00000010;
-        const METRONOME = 0b00000100;
+        // /// Reasamplomatic5000
+        // const RS5K = 0b00000010;
+        const PLUGIN = 0b00000100;
+        const RECORD_PATH = 0b01000000;
+        const METRONOME = 0b10000000;
     }
 }
 
@@ -236,6 +240,11 @@ impl Display for Usages {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.contains(Self::ITEM) {
             write!(f, "I")?;
+        } else {
+            write!(f, " ")?;
+        }
+        if self.contains(Self::PLUGIN) {
+            write!(f, "P")?;
         } else {
             write!(f, " ")?;
         }
@@ -253,7 +262,7 @@ impl Display for Usages {
     }
 }
 
-pub type PathUsages<'a> = HashMap<&'a Path, Usages>;
+pub type PathUsages<'a> = BTreeMap<Cow<'a, Path>, Usages>;
 
 pub struct Project<'a> {
     pub date: Timestamp,
@@ -286,7 +295,7 @@ pub fn parse_project<'a>(e: &'a Element<'a>) -> Result<Project<'a>, String> {
                         format!("expected project record path to have exactly 2 values: {vals:?}")
                     })?;
                     file_usages
-                        .entry(Path::new(record_path))
+                        .entry(Path::new(record_path).into())
                         .or_default()
                         .insert(Usages::RECORD_PATH);
                 }
@@ -300,12 +309,18 @@ pub fn parse_project<'a>(e: &'a Element<'a>) -> Result<Project<'a>, String> {
                 // }
                 "MASTERFXLIST" => {
                     for path in extract_fxchain_paths(child) {
-                        println!("FXLIST TODO: {}", path.display());
+                        file_usages
+                            .entry(path.into())
+                            .or_default()
+                            .insert(Usages::PLUGIN);
                     }
                 }
                 "TRACK" => {
                     for path in iter_track_item_paths(child) {
-                        file_usages.entry(path).or_default().insert(Usages::ITEM);
+                        file_usages
+                            .entry(path.into())
+                            .or_default()
+                            .insert(Usages::ITEM);
                     }
 
                     let fxchain = child
@@ -323,7 +338,10 @@ pub fn parse_project<'a>(e: &'a Element<'a>) -> Result<Project<'a>, String> {
                         .next();
                     if let Some(fxchain) = fxchain {
                         for path in extract_fxchain_paths(fxchain) {
-                            println!("FXLIST TODO: {}", path.display());
+                            file_usages
+                                .entry(path.into())
+                                .or_default()
+                                .insert(Usages::PLUGIN);
                         }
                     }
                 }
