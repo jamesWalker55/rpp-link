@@ -42,8 +42,12 @@ fn find_fxchain_plugins<'a>(e: &'a Element<'a>, out: &mut Vec<&'a Element<'a>>) 
             // both vst2 and vst3
             "VST" | "CLAP" => out.push(child),
             "CONTAINER" => find_fxchain_plugins(child, out),
-            "JS" | "PARMENV" | "PROGRAMENV" => (),
-            _ => todo!("unhandled plugin type! {:?}", child.tag),
+            "JS" | "PARMENV" | "PROGRAMENV" | "IN_PINS" | "OUT_PINS" | "JS_SER" | "JS_PINMAP" => (),
+            _ => {
+                eprintln!("unhandled plugin type! {:?}", child.tag);
+                eprintln!("{:?}", e);
+                todo!("unhandled plugin type! {:?}", child.tag)
+            }
         }
     }
 }
@@ -116,7 +120,7 @@ fn get_source_path<'a>(e: &'a Element<'a>) -> Option<&'a Path> {
     };
     match source_type {
         "MIDI" | "MIDIPOOL" => None,
-        "FLAC" | "WAVE" | "RPP_PROJECT" => {
+        "FLAC" | "WAVE" | "VORBIS" | "RPP_PROJECT" | "VIDEO" => {
             let source_file = e
                 .children
                 .iter()
@@ -135,7 +139,8 @@ fn get_source_path<'a>(e: &'a Element<'a>) -> Option<&'a Path> {
                 Some(Path::new(source_file))
             } else {
                 eprintln!("failed to find source path in <{}>", source_type);
-                None
+                eprintln!("{:?}", e);
+                panic!("failed to find source path in <{}>", source_type);
             }
         }
         "SECTION" => {
@@ -154,10 +159,13 @@ fn get_source_path<'a>(e: &'a Element<'a>) -> Option<&'a Path> {
                 .next()
                 .or_else(|| {
                     eprintln!("failed to find source path in <SECTION>");
-                    None
+                    eprintln!("{:?}", e);
+                    panic!("failed to find source path in <SECTION>");
                 })
         }
         _ => {
+            eprintln!("unhandled source type! {:?}", source_type);
+            eprintln!("{:?}", e);
             todo!("unhandled source type! {:?}", source_type)
         }
     }
