@@ -1,9 +1,14 @@
-use std::{collections::HashMap, fmt::Display, path::Path};
+use std::{
+    collections::HashMap,
+    fmt::Display,
+    path::{Path, PathBuf},
+};
 
 use base64_simd::STANDARD as base64;
 use bitflags::bitflags;
 use jiff::Timestamp;
 use rpp_parser::parser::{Child, Element};
+use smallvec::{SmallVec, smallvec};
 
 fn iter_metronome_paths<'a>(e: &'a Element<'a>) -> impl Iterator<Item = &'a Path> {
     e.children
@@ -33,11 +38,10 @@ fn find_fxchain_plugins<'a>(e: &'a Element<'a>, out: &mut Vec<&'a Element<'a>>) 
         };
         match child.tag {
             // both vst2 and vst3
-            "VST" => out.push(child),
-            "CLAP" => out.push(child),
+            "VST" | "CLAP" => out.push(child),
             "CONTAINER" => find_fxchain_plugins(child, out),
-            // "JS" => None,
-            _ => (),
+            "JS" | "PARMENV" | "PROGRAMENV" => (),
+            _ => todo!("unhandled plugin type! {:?}", child.tag),
         }
     }
 }
@@ -183,6 +187,42 @@ fn iter_track_item_paths<'a>(e: &'a Element<'a>) -> impl Iterator<Item = &'a Pat
         .filter_map(|source| get_source_path(source))
 }
 
+fn extract_plugin_path(e: &Element) -> Option<PathBuf> {
+    if e.tag == "VST"
+        && e.attr
+            .get(1)
+            .map(|ident| *ident == "reasamplomatic.dll")
+            .unwrap_or(false)
+    {
+        // reasamplomatic
+        let Some(strings) = extract_plugin_strings(e) else {
+            eprintln!("failed to get sample path from reasamplomatic fx");
+            return None;
+        };
+        strings.get(0).map(PathBuf::from)
+    } else {
+        let Some(strings) = extract_plugin_strings(e) else {
+            return None;
+        };
+        println!("  <{} {:?}> {:?}", e.tag, e.attr, strings);
+        // TODO
+        None
+    }
+}
+
+fn extract_fxchain_paths(e: &Element) -> SmallVec<[PathBuf; 2]> {
+    let plugins = {
+        let mut out = vec![];
+        find_fxchain_plugins(e, &mut out);
+        out
+    };
+
+    plugins
+        .into_iter()
+        .filter_map(|plugin| extract_plugin_path(plugin))
+        .collect()
+}
+
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
     pub struct Usages: u8 {
@@ -258,51 +298,34 @@ pub fn parse_project<'a>(e: &'a Element<'a>) -> Result<Project<'a>, String> {
                 //         file_usages.push((Usage::Metronome, path));
                 //     }
                 // }
-                // "MASTERFXLIST" => {
-                //     let plugins = {
-                //         let mut out = vec![];
-                //         find_fxchain_plugins(child, &mut out);
-                //         out
-                //     };
-                //     for plugin in plugins {
-                //         let Some(strings) = extract_plugin_strings(plugin) else {
-                //             continue;
-                //         };
-                //         println!("  <{} {:?}> {:?}", plugin.tag, plugin.attr, strings);
-                //         // TODO
-                //     }
-                // }
+                "MASTERFXLIST" => {
+                    for path in extract_fxchain_paths(child) {
+                        println!("FXLIST TODO: {}", path.display());
+                    }
+                }
                 "TRACK" => {
                     for path in iter_track_item_paths(child) {
                         file_usages.entry(path).or_default().insert(Usages::ITEM);
                     }
-                    // let fxchain = child
-                    //     .children
-                    //     .iter()
-                    //     .filter_map(|x| {
-                    //         if let Child::Element(x) = x
-                    //             && x.tag == "FXCHAIN"
-                    //         {
-                    //             Some(x)
-                    //         } else {
-                    //             None
-                    //         }
-                    //     })
-                    //     .next();
-                    // if let Some(fxchain) = fxchain {
-                    //     let plugins = {
-                    //         let mut out = vec![];
-                    //         find_fxchain_plugins(fxchain, &mut out);
-                    //         out
-                    //     };
-                    //     for plugin in plugins {
-                    //         let Some(strings) = extract_plugin_strings(plugin) else {
-                    //             continue;
-                    //         };
-                    //         println!("  <{} {:?}> {:?}", plugin.tag, plugin.attr, strings);
-                    //         // TODO
-                    //     }
-                    // }
+
+                    let fxchain = child
+                        .children
+                        .iter()
+                        .filter_map(|x| {
+                            if let Child::Element(x) = x
+                                && x.tag == "FXCHAIN"
+                            {
+                                Some(x)
+                            } else {
+                                None
+                            }
+                        })
+                        .next();
+                    if let Some(fxchain) = fxchain {
+                        for path in extract_fxchain_paths(fxchain) {
+                            println!("FXLIST TODO: {}", path.display());
+                        }
+                    }
                 }
                 _ => (),
             },

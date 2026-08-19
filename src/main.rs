@@ -62,20 +62,6 @@ fn main() {
             x
         };
         for (path, usage) in sorted_usages {
-            // if path.is_relative() {
-            //     println!(
-            //         " [{}] {}",
-            //         usage,
-            //         entry
-            //             .path()
-            //             .parent()
-            //             .expect("project parent dir")
-            //             .join(path)
-            //             .display(),
-            //     );
-            // } else {
-            //     println!(" [{}] {}", usage, path.display());
-            // }
             println!(" [{}] {}", usage, path.display());
         }
     }
