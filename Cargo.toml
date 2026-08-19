@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 base64-simd = "0.8.0"
+bitflags = "2.13.1"
 itertools = "0.15.0"
 jiff = "0.2.35"
 pico-args = "0.5.0"

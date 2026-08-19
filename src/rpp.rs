@@ -1,6 +1,7 @@
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 use base64_simd::STANDARD as base64;
+use bitflags::bitflags;
 use jiff::Timestamp;
 use rpp_parser::parser::{Child, Element};
 
@@ -182,18 +183,20 @@ fn iter_track_item_paths<'a>(e: &'a Element<'a>) -> impl Iterator<Item = &'a Pat
         .filter_map(|source| get_source_path(source))
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Usage {
-    Metronome,
-    RecordPath,
-    Item,
+bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+    pub struct Usages: u8 {
+        const ITEM = 0b00000001;
+        const RECORD_PATH = 0b00000010;
+        const METRONOME = 0b00000100;
+    }
 }
 
-pub type FileUsages<'a> = Vec<(Usage, &'a Path)>;
+pub type PathUsages<'a> = HashMap<&'a Path, Usages>;
 
 pub struct Project<'a> {
     pub date: Timestamp,
-    pub usages: FileUsages<'a>,
+    pub usages: PathUsages<'a>,
 }
 
 pub fn parse_project<'a>(e: &'a Element<'a>) -> Result<Project<'a>, String> {
@@ -212,7 +215,7 @@ pub fn parse_project<'a>(e: &'a Element<'a>) -> Result<Project<'a>, String> {
         Timestamp::from_second(num).map_err(|_| format!("invalid project date: {:?}", e.attr))?
     };
 
-    let mut file_usages: FileUsages = vec![];
+    let mut file_usages: PathUsages = PathUsages::new();
 
     for child in &e.children {
         match child {
@@ -221,7 +224,10 @@ pub fn parse_project<'a>(e: &'a Element<'a>) -> Result<Project<'a>, String> {
                     let [record_path, _] = vals.try_into().map_err(|_| {
                         format!("expected project record path to have exactly 2 values: {vals:?}")
                     })?;
-                    file_usages.push((Usage::RecordPath, Path::new(record_path)));
+                    file_usages
+                        .entry(Path::new(record_path))
+                        .or_default()
+                        .insert(Usages::RECORD_PATH);
                 }
                 _ => (),
             },
@@ -247,7 +253,7 @@ pub fn parse_project<'a>(e: &'a Element<'a>) -> Result<Project<'a>, String> {
                 // }
                 "TRACK" => {
                     for path in iter_track_item_paths(child) {
-                        file_usages.push((Usage::Item, path));
+                        file_usages.entry(path).or_default().insert(Usages::ITEM);
                     }
                     // let fxchain = child
                     //     .children
