@@ -23,6 +23,23 @@ except ImportError:
 COMMAND = "rpp-link.exe"
 
 
+def decode_bytes(data: bytes) -> str:
+    """
+    Decode subprocess output robustly. rpp-link.exe's output isn't
+    guaranteed to be in the system's default codepage (e.g. cp1252 on
+    Windows), so try utf-8 first, then fall back to cp1252, then finally
+    to latin-1 with replacement characters so we never crash.
+    """
+    if not data:
+        return ""
+    for encoding in ("utf-8", "cp1252"):
+        try:
+            return data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return data.decode("latin-1", errors="replace")
+
+
 def parse_drop_data(data: str) -> str:
     """
     tkinterdnd2 gives file paths wrapped in {curly braces} if they contain
@@ -119,13 +136,15 @@ class App:
             result = subprocess.run(
                 [COMMAND, path],
                 capture_output=True,
-                text=True,
+                text=False,  # get raw bytes; decode ourselves below
             )
-            output = result.stdout or ""
-            if result.stderr:
+            stdout = decode_bytes(result.stdout)
+            stderr = decode_bytes(result.stderr)
+            output = stdout
+            if stderr:
                 if output and not output.endswith("\n"):
                     output += "\n"
-                output += result.stderr
+                output += stderr
             if not output.strip():
                 output = f"(no output, exit code {result.returncode})"
             self.status.config(
