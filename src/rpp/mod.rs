@@ -1,6 +1,8 @@
+mod utils;
+
 use std::{
     borrow::Cow,
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     fmt::Display,
     path::{Path, PathBuf},
     sync::LazyLock,
@@ -11,23 +13,6 @@ use bitflags::bitflags;
 use jiff::Timestamp;
 use rpp_parser::parser::{Child, Element};
 use smallvec::{SmallVec, smallvec};
-
-fn child_as_arr<'a, const N: usize>(child: &'a Child<'a>) -> Option<[&'a str; N]> {
-    let Child::Line(line) = child else {
-        return None;
-    };
-    let Ok(res) = TryInto::<[&str; N]>::try_into(line.as_slice()) else {
-        return None;
-    };
-    Some(res)
-}
-
-fn attr_as_arr<'a, const N: usize>(attr: &'a [&'a str]) -> Option<[&'a str; N]> {
-    let Ok(res) = TryInto::<[&str; N]>::try_into(attr) else {
-        return None;
-    };
-    Some(res)
-}
 
 fn iter_metronome_paths<'a>(e: &'a Element<'a>) -> impl Iterator<Item = &'a Path> {
     e.children
@@ -132,7 +117,7 @@ fn extract_plugin_strings<'a>(plugin: &'a Element<'a>) -> Option<Vec<String>> {
 }
 
 fn get_source_path<'a>(e: &'a Element<'a>) -> Option<&'a Path> {
-    let Some([mut source_type]) = attr_as_arr(&e.attr) else {
+    let Some([mut source_type]) = utils::attr_as_arr(&e.attr) else {
         eprintln!("item source attr has more than 1 value: {:?}", e.attr);
         return None;
     };
@@ -146,7 +131,7 @@ fn get_source_path<'a>(e: &'a Element<'a>) -> Option<&'a Path> {
                 .children
                 .iter()
                 .filter_map(|child| {
-                    if let Some([key, val]) = child_as_arr(child)
+                    if let Some([key, val]) = utils::child_as_arr(child)
                         && key == "FILE"
                     {
                         Some(Path::new(val))
@@ -167,7 +152,7 @@ fn get_source_path<'a>(e: &'a Element<'a>) -> Option<&'a Path> {
                 .children
                 .iter()
                 .filter_map(|child| {
-                    if let Some([key, val, _]) = child_as_arr(child)
+                    if let Some([key, val, _]) = utils::child_as_arr(child)
                         && key == "FILE"
                     {
                         Some(Path::new(val))
