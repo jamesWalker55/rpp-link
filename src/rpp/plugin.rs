@@ -4,8 +4,6 @@ use base64_simd::STANDARD as base64;
 use rpp_parser::parser::{Child, Element};
 use smallvec::{SmallVec, smallvec};
 
-use crate::rpp::utils::attr_as_arr;
-
 fn b64_extract_strings(children: &[Child]) -> Vec<String> {
     let lines = children.iter().filter_map(|x| {
         if let Child::Line(items) = x {
@@ -37,14 +35,14 @@ fn b64_extract_strings(children: &[Child]) -> Vec<String> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PluginKind {
+pub enum PluginKind {
     VST,
     CLAP,
     JS,
 }
 
 #[derive(Debug, Clone)]
-struct Plugin<'a> {
+pub struct Plugin<'a> {
     kind: PluginKind,
     display_name: &'a str,
     ident: &'a str,

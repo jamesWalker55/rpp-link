@@ -8,6 +8,8 @@ use bitflags::bitflags;
 use jiff::Timestamp;
 use rpp_parser::parser::{Child, Element};
 
+pub use crate::rpp::plugin::{Plugin, PluginKind};
+
 /// Find all paths in a `<METRONOME>` element
 fn iter_metronome_paths<'a>(e: &'a Element<'a>) -> impl Iterator<Item = &'a Path> {
     e.children
