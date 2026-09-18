@@ -50,6 +50,18 @@ pub struct Plugin<'a> {
 }
 
 impl<'a> Plugin<'a> {
+    pub fn kind(&self) -> PluginKind {
+        self.kind
+    }
+
+    pub fn display_name(&self) -> &str {
+        self.display_name
+    }
+
+    pub fn ident(&self) -> &str {
+        self.ident
+    }
+
     fn extract_raw_strings_from_data(&self) -> Result<Vec<String>, &'static str> {
         match self.kind {
             // both vst2 and vst3
@@ -82,7 +94,7 @@ impl<'a> Plugin<'a> {
     }
 
     /// Plugin-specific logic for extracting paths
-    fn extract_paths(&self) -> SmallVec<[PathBuf; 1]> {
+    pub fn extract_paths(&self) -> SmallVec<[PathBuf; 1]> {
         if matches!(self.kind, PluginKind::VST) && self.ident == "reasamplomatic.dll" {
             let strings = match self.extract_raw_strings_from_data() {
                 Ok(x) => x,
@@ -172,7 +184,7 @@ impl<'a> Plugin<'a> {
 }
 
 /// Scan a `FXCHAIN` element for all plugin instances
-fn collect_plugins<'a>(e: &'a Element<'a>, out: &mut Vec<Plugin<'a>>) {
+pub fn collect_plugins<'a>(e: &'a Element<'a>, out: &mut Vec<Plugin<'a>>) {
     for child in &e.children {
         let Child::Element(child) = child else {
             continue;
